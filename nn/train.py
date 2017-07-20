@@ -7,6 +7,7 @@ from scipy.ndimage.filters import gaussian_filter
 from multiprocessing import Pool, cpu_count
 from model import bbox_model
 import math
+import cv2
 
 im_heigth = 9*40
 im_width = 16*40
@@ -17,10 +18,10 @@ vin_length = 17
 
 # random backgrounds
 bcgs = []
-bcgs_path = '../../SUN_bcgs/'
+bcgs_path = '/DATA/cars/'
 
 
-if False:
+if True:
     bcgs = [os.path.join(root, f) for root, _, files in os.walk(bcgs_path) for f in files if f.endswith('.jpg')]
 
     with open('bcgs.txt', 'w') as f:
@@ -41,9 +42,29 @@ def rotate_coord(x, y, x0, y0, angle):
     rad = math.radians(angle)
     x -= x0
     y -= y0
-    xr = x * math.cos(rad) - y * math.sin(rad) + x0
+    xr = x * math.cos(rad) + y * math.sin(rad) + x0
     yr = y * math.cos(rad) - x * math.sin(rad) + y0
     return [xr, yr]
+
+
+def crop_rotate(image, angle, a, b):
+    (h, w) = image.shape[:2]
+
+    center = ((a[0]+b[0])/2., (a[1]+b[1])/2.)
+
+    M = cv2.getRotationMatrix2D(center, angle, 1)
+    rotated = cv2.warpAffine(image, M, (w, h))
+
+    a_rotated = rotate_coord(a[0], a[1], center[0], center[1], angle)
+    b_rotated = rotate_coord(b[0], b[1], center[0], center[1], angle)
+
+    minx = int(min(a_rotated[0], b_rotated[0], w))
+    miny = int(min(a_rotated[1], b_rotated[1], h))
+    maxx = int(max(a_rotated[0], b_rotated[0], 0))
+    maxy = int(max(a_rotated[1], b_rotated[1], 0))
+
+    crop = rotated[miny:maxy, minx:maxx]
+    return crop
 
 
 def process(z):
@@ -81,8 +102,8 @@ def process(z):
 
         rot_coords[0] = rotate_coord(0, (t_img_size - t_height)/2., t_img_size/2., t_img_size/2., rot_deg)
         rot_coords[1] = rotate_coord(0, (t_img_size + t_height)/2., t_img_size/2., t_img_size/2., rot_deg)
-        rot_coords[2] = rotate_coord(t_img_size, (t_img_size - t_height)/2., t_img_size/2., t_img_size/2., rot_deg)
-        rot_coords[3] = rotate_coord(t_img_size, (t_img_size + t_height)/2., t_img_size/2., t_img_size/2., rot_deg)
+        rot_coords[2] = rotate_coord(t_img_size, (t_img_size + t_height)/2., t_img_size/2., t_img_size/2., rot_deg)
+        rot_coords[3] = rotate_coord(t_img_size, (t_img_size - t_height)/2., t_img_size/2., t_img_size/2., rot_deg)
 
         min_tx = round(np.min(rot_coords[:, 0]))
         max_tx = round(np.max(rot_coords[:, 0]))
@@ -102,12 +123,11 @@ def process(z):
             draw = ImageDraw.Draw(text_image)
             draw.text((0, round(t_img_size/2. - t_height/2.)), vin, font=font, fill=255)
             text_image = text_image.rotate(rot_deg)
-            # text_image.save('tmp/t_' + vin + '.jpg')
 
             x = random.randint(-min_tx, im_width - max_tx)
             y = random.randint(-min_ty, im_heigth - max_ty)
 
-            color = random.randint(128, 255)
+            color = random.randint(0, 255)
 
             if random.uniform(0, 1) > 0.5:
                 bcg_img = bcg_img.transpose(random.choice(flips))
@@ -118,21 +138,25 @@ def process(z):
             sigma = random.uniform(0, 2)
             bcg_img = gaussian_filter(bcg_img, sigma)
 
-            # from scipy.misc import imsave
-            # imsave('tmp/%s_%s_%s.jpg' % (vin, x, y), bcg_img)
+            from scipy.misc import imsave
+            imsave('tmp/%s_%s_%s.jpg' % (vin, x, y), bcg_img)
 
             bcg_img = np.array(bcg_img, dtype='uint8')
 
+            rot_coords[:] += [x, y]
+
+            # bcg_img = cv2.polylines(bcg_img, np.int32([rot_coords]), 1, (255,255,255))
+
             # end points of center line going through text
-            m_point_a = (rot_coords[0] + rot_coords[1])/2
-            m_point_b = (rot_coords[2] + rot_coords[3])/2
+            # m_point_a = (rot_coords[0] + rot_coords[1])/2
+            # m_point_b = (rot_coords[2] + rot_coords[3])/2
 
             # output endpoints and height to define rectangle
             c = [
                 rot_coords[0, 0]/im_width,
                 rot_coords[0, 1]/im_heigth,
-                rot_coords[3, 0]/im_width,
-                rot_coords[3, 1]/im_heigth,
+                rot_coords[2, 0]/im_width,
+                rot_coords[2, 1]/im_heigth,
                 # m_point_a[0]/im_width,
                 # m_point_a[1]/im_heigth,
                 # m_point_b[0]/im_width,
@@ -141,13 +165,21 @@ def process(z):
                 #t_height#/t_width
             ]
 
+            # crop = crop_rotate(bcg_img, -rot_deg, rot_coords[0],rot_coords[2])
+            #
+            # from scipy.misc import imsave
+            # try:
+            #     imsave('tmp/%s_%s_%s.jpg' % (vin, x, y), crop)
+            # except:
+            #     print('trololo')
+
             return [np.reshape(bcg_img, (im_heigth, im_width, 1)), c]
 
 
 pool = Pool(cpu_count() // 2)
 
 
-def gen(batch_size=30):
+def gen(batch_size=8):
     x = np.zeros((batch_size, im_heigth, im_width, 1), dtype='float32')
     y = np.zeros((batch_size, coords_count), dtype='float32')
     while True:
@@ -164,7 +196,7 @@ model = bbox_model(shape=input_shape, coords_count=coords_count)
 # model = to_multi_gpu(model, 2)
 
 model.compile(loss="mean_squared_error", optimizer='adam')
-model.load_weights('checkpoints/vl0.0087.hdf5')
+#model.load_weights('checkpoints/vl0.0087.hdf5')
 model.summary()
 
 model.fit_generator(generator=gen(),
