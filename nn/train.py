@@ -6,8 +6,7 @@ from PIL import Image, ImageFont, ImageDraw, ImageOps
 from scipy.ndimage.filters import gaussian_filter
 from multiprocessing import Pool, cpu_count
 from model import bbox_model
-import math
-import cv2
+from utils import rotate_coord, crop_rotate
 
 im_heigth = 9*40
 im_width = 16*40
@@ -34,37 +33,6 @@ else:
 
 
 fonts = [os.path.join(root, f) for root, _, files in os.walk('fonts/') for f in files if f.endswith('.ttf')]
-
-
-# rotate point (x, y) around (x0, y0) on angle
-# taking into account that Y axis looks down
-def rotate_coord(x, y, x0, y0, angle):
-    rad = math.radians(angle)
-    x -= x0
-    y -= y0
-    xr = x * math.cos(rad) + y * math.sin(rad) + x0
-    yr = y * math.cos(rad) - x * math.sin(rad) + y0
-    return [xr, yr]
-
-
-def crop_rotate(image, angle, a, b):
-    (h, w) = image.shape[:2]
-
-    center = ((a[0]+b[0])/2., (a[1]+b[1])/2.)
-
-    M = cv2.getRotationMatrix2D(center, angle, 1)
-    rotated = cv2.warpAffine(image, M, (w, h))
-
-    a_rotated = rotate_coord(a[0], a[1], center[0], center[1], angle)
-    b_rotated = rotate_coord(b[0], b[1], center[0], center[1], angle)
-
-    minx = int(min(a_rotated[0], b_rotated[0], w))
-    miny = int(min(a_rotated[1], b_rotated[1], h))
-    maxx = int(max(a_rotated[0], b_rotated[0], 0))
-    maxy = int(max(a_rotated[1], b_rotated[1], 0))
-
-    crop = rotated[miny:maxy, minx:maxx]
-    return crop
 
 
 def process(z):
@@ -138,8 +106,8 @@ def process(z):
             sigma = random.uniform(0, 2)
             bcg_img = gaussian_filter(bcg_img, sigma)
 
-            from scipy.misc import imsave
-            imsave('tmp/%s_%s_%s.jpg' % (vin, x, y), bcg_img)
+            # from scipy.misc import imsave
+            # imsave('tmp/%s_%s_%s.jpg' % (vin, x, y), bcg_img)
 
             bcg_img = np.array(bcg_img, dtype='uint8')
 
@@ -196,7 +164,7 @@ model = bbox_model(shape=input_shape, coords_count=coords_count)
 # model = to_multi_gpu(model, 2)
 
 model.compile(loss="mean_squared_error", optimizer='adam')
-#model.load_weights('checkpoints/vl0.0087.hdf5')
+model.load_weights('checkpoints/vl0.0101.hdf5')
 model.summary()
 
 model.fit_generator(generator=gen(),

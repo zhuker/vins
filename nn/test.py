@@ -2,13 +2,15 @@ from model import bbox_model
 from PIL import Image
 import numpy as np
 from scipy.misc import imsave
+from utils import crop_rotate
+
 
 im_heigth = 9*40
 im_width = 16*40
 input_shape = (im_heigth, im_width, 1)
 
 model = bbox_model(shape=input_shape, coords_count=5)
-model.load_weights('checkpoints/vl0.0045.hdf5')
+model.load_weights('checkpoints/vl0.0101.hdf5')
 
 img = Image.open('../20170703_165336.jpg')
 img = img.resize((im_width, im_heigth))
