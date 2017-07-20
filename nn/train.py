@@ -14,6 +14,7 @@ input_shape = (im_heigth, im_width, 1)
 coords_count = 5
 nb_epoch = 50
 vin_length = 17
+max_angle = 45.
 
 # random backgrounds
 bcgs = []
@@ -60,7 +61,7 @@ def process(z):
         t_img_size = max(t_height, t_width)
 
         # rot_deg = random.uniform(0, 360)
-        rot_deg = random.uniform(-10, 10)
+        rot_deg = random.uniform(-max_angle, max_angle)
 
         # text image will have original text located horizontally in the middle
         # original coordinates will be (0, (s-h)/2) - top left and (s, (s+h)/2) - bottom right
@@ -121,15 +122,15 @@ def process(z):
 
             # output endpoints and height to define rectangle
             c = [
-                rot_coords[0, 0]/im_width,
-                rot_coords[0, 1]/im_heigth,
-                rot_coords[2, 0]/im_width,
-                rot_coords[2, 1]/im_heigth,
+                2 * (rot_coords[0, 0]/im_width)-1,
+                2 * (rot_coords[0, 1]/im_heigth)-1,
+                2 * (rot_coords[2, 0]/im_width)-1,
+                2 * (rot_coords[2, 1]/im_heigth)-1,
                 # m_point_a[0]/im_width,
                 # m_point_a[1]/im_heigth,
                 # m_point_b[0]/im_width,
                 # m_point_b[1]/im_heigth,
-                rot_deg / 360.
+                rot_deg / max_angle
                 #t_height#/t_width
             ]
 
@@ -163,8 +164,8 @@ def gen(batch_size=8):
 model = bbox_model(shape=input_shape, coords_count=coords_count)
 # model = to_multi_gpu(model, 2)
 
-model.compile(loss="mean_squared_error", optimizer='adam')
-model.load_weights('checkpoints/vl0.0101.hdf5')
+model.compile(loss="mean_squared_error", optimizer='sgd')
+#model.load_weights('checkpoints/vl0.0101.hdf5')
 model.summary()
 
 model.fit_generator(generator=gen(),

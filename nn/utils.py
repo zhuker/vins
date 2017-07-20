@@ -2,6 +2,17 @@ import cv2
 import math
 
 
+
+def mirror(a,b,angle):
+    c = ((a[0] + b[0])/2, (a[1] + b[1])/2)
+    a_r = rotate_coord(a[0], a[1], c[0], c[1], -angle)
+    b_r = rotate_coord(b[0], b[1], c[0], c[1], -angle)
+
+    a_rr = rotate_coord(a_r[0], b_r[1], c[0], c[1], angle)
+    b_rr = rotate_coord(b_r[0], a_r[1], c[0], c[1], angle)
+
+    return a_rr, b_rr
+
 # rotate point (x, y) around (x0, y0) on angle
 # taking into account that Y axis looks down
 def rotate_coord(x, y, x0, y0, angle):
