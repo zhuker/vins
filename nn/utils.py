@@ -1,6 +1,26 @@
 import cv2
 import math
+import random
 
+vocabulary = ' 1234567890ABCDEFGHJKLMNPRSTUVWXYZ'
+
+
+def generateVin(vin_len, max_spaces):
+    vin = ''
+    spaces = 0
+    while len(vin) < vin_len:
+        c = random.choice(vocabulary)
+        if c == ' ' and spaces < max_spaces:
+            spaces += 1
+        elif c == ' ' and spaces >= max_spaces:
+            continue
+        vin += c
+    return vin.strip()
+
+
+def getLabel(vin):
+    Y = [vocabulary.index(char) for char in vin]
+    return Y, len(vin)
 
 
 def mirror(a,b,angle):
