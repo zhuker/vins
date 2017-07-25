@@ -1,13 +1,8 @@
 from segmentmodel import getSegModel
-from utils import vocabulary
 from PIL import Image
 import numpy as np
-from scipy.misc import imsave
-from utils import crop_rotate, mirror
-import cv2
 import os
-import math
-import itertools
+from multi_gpu import make_parallel
 
 im_heigth = 9*40
 im_width = 16*40
@@ -15,7 +10,9 @@ input_shape = (im_heigth, im_width, 1)
 max_angle = 45
 
 model = getSegModel(input_shape)
-model.load_weights('checkpoints/segmenter_vl0.0561.hdf5')
+# model = make_parallel(model, 1)
+model.compile('adam', 'binary_crossentropy')
+model.load_weights('checkpoints/segmenter_vl0.0376.hdf5', by_name=True)
 
 imgs = [os.path.join(root, f) for root, _, files in os.walk('./tmp') for f in files if f.lower().endswith('.jpg')]
 
@@ -32,6 +29,6 @@ for imgpath in imgs:
     mask *= 255
 
     from scipy.misc import imsave
-    imsave(imgpath.replace('tmp','res'), mask.astype(np.uint8)[:,:,0])
+    imsave(imgpath.replace('tmp', 'res'), mask.astype(np.uint8)[:, :, 0])
 
     # sudo fuser -v /dev/nvidia*

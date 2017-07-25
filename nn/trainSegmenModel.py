@@ -4,9 +4,11 @@ import random
 import os
 from PIL import Image, ImageFont, ImageDraw, ImageOps
 from scipy.ndimage.filters import gaussian_filter
-from multiprocessing import Pool, cpu_count
+from multiprocessing import cpu_count
+from multiprocessing.pool import ThreadPool
 from segmentmodel import getSegModel
-from utils import generateVin, rotate_coord, getLabel, vocabulary
+from utils import generateVin, rotate_coord
+from multi_gpu import make_parallel
 
 im_heigth = 9 * 40
 im_width = 16 * 40
@@ -20,7 +22,7 @@ maxLength = vin_length + max_spaces
 
 # random backgrounds
 bcgs = []
-bcgs_path = '/DATA/cars/'
+bcgs_path = '../../SUN_bcgs/'
 
 if True:
     bcgs = [os.path.join(root, f) for root, _, files in os.walk(bcgs_path) for f in files if f.endswith('.jpg')]
@@ -48,7 +50,7 @@ def process(z):
     ]
     k = 0
     while True:
-        k+=1
+        k += 1
         vin = generateVin(vin_length, max_spaces)
         if len(vin) < maxLength:
             for i in range(maxLength - len(vin)):
@@ -70,12 +72,14 @@ def process(z):
         # we rotate all four corners of text around the center of the image (s/2, s/2) on the chosen angle
         # and check if rotated text can be fitted in background image
 
-        rot_coords[0] = rotate_coord(0, (t_img_size - t_height) / 2., t_img_size / 2., t_img_size / 2., rot_deg)
-        rot_coords[1] = rotate_coord(0, (t_img_size + t_height) / 2., t_img_size / 2., t_img_size / 2., rot_deg)
-        rot_coords[2] = rotate_coord(t_img_size, (t_img_size + t_height) / 2., t_img_size / 2., t_img_size / 2.,
-                                     rot_deg)
-        rot_coords[3] = rotate_coord(t_img_size, (t_img_size - t_height) / 2., t_img_size / 2., t_img_size / 2.,
-                                     rot_deg)
+        rot_coords[0] = rotate_coord(
+            0, (t_img_size - t_height) / 2., t_img_size / 2., t_img_size / 2., rot_deg)
+        rot_coords[1] = rotate_coord(
+            0, (t_img_size + t_height) / 2., t_img_size / 2., t_img_size / 2., rot_deg)
+        rot_coords[2] = rotate_coord(
+            t_img_size, (t_img_size + t_height) / 2., t_img_size / 2., t_img_size / 2., rot_deg)
+        rot_coords[3] = rotate_coord(
+            t_img_size, (t_img_size - t_height) / 2., t_img_size / 2., t_img_size / 2., rot_deg)
 
         min_tx = round(np.min(rot_coords[:, 0]))
         max_tx = round(np.max(rot_coords[:, 0]))
@@ -96,8 +100,8 @@ def process(z):
             draw.text((0, round(t_img_size / 2. - t_height / 2.)), vin, font=font, fill=255)
             text_image = text_image.rotate(rot_deg)
 
-            x = random.randint(-min_tx, im_width - max_tx)  # int((-min_tx + im_width-max_tx)/2)
-            y = random.randint(-min_ty, im_heigth - max_ty)  # int((-min_ty + im_heigth-max_ty)/2)
+            x = random.randint(-min_tx, im_width - max_tx)
+            y = random.randint(-min_ty, im_heigth - max_ty)
 
             color = random.randint(2, 255)
 
@@ -114,43 +118,49 @@ def process(z):
             colorization = ImageOps.colorize(text_image, (0, 0, 0), (255, 255, 255))
             mask.paste(colorization, (x, y), text_image)
             mask = np.array(mask, dtype=np.float)
-            mask[mask>0] = 1
+            mask[mask > 0] = 1
 
             bcg_img = np.array(bcg_img, dtype='uint8')
 
-            #from scipy.misc import imsave
-            #imsave('tmp/%s_%s_%s.jpg' % (vin, x, y), bcg_img)
+            # from scipy.misc import imsave
+            # imsave('tmp/%s_%s_%s.jpg' % (vin, x, y), bcg_img)
 
-            mask = mask.reshape((im_heigth, im_width, 1))
+            # mask = mask.reshape((im_heigth, im_width, 1))
 
             rot_coords[:] += [x, y]
-            #print k
-            return [np.reshape(bcg_img, (im_heigth, im_width, 1)), mask]
+            # print k
+            # return [np.reshape(bcg_img, (im_heigth, im_width, 1)), mask]
+            mask = np.packbits(np.asarray(mask, dtype='bool'), axis=-1)
+            return [bcg_img, mask]
 
 
-pool = Pool(cpu_count() // 2)
+pool = ThreadPool(8)
 
 
-def gen(batch_size=1):
+def gen(batch_size=16):
     x = np.zeros((batch_size, im_heigth, im_width, 1), dtype='float32')
     y = np.zeros((batch_size, im_heigth, im_width, 1), dtype=np.float)
 
     while True:
         result = pool.map(process, range(batch_size))
         for i, v in enumerate(result):
-            x[i] = v[0] / 127.5 - 1
-            y[i] = v[1]
+            x[i, :, :, 0] = v[0] / 127.5 - 1
+            y[i, :, :, 0] = np.unpackbits(v[1], axis=-1)
 
         yield (x, y)
 
 
 model = getSegModel(input_shape)
-#model.load_weights('checkpoints/spatial_transformer_vl0.5295.hdf5')
+# model = make_parallel(model, 2)
+model.compile('adam', 'binary_crossentropy')
+
+# model.load_weights('checkpoints/spatial_transformer_vl0.5295.hdf5')
 model.summary()
+# model.load_weights('checkpoints/segmenter_vl0.0228.hdf5')
 
 model.fit_generator(generator=gen(),
                     validation_data=gen(),
-                    steps_per_epoch=3000,
+                    steps_per_epoch=500,
                     validation_steps=100,
                     epochs=nb_epoch,
                     max_q_size=100,
