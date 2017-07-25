@@ -16,7 +16,7 @@ input_shape = (im_heigth, im_width, 1)
 max_angle = 45
 
 model = getSegModel(input_shape)
-model.load_weights('checkpoints/segmenter_vl0.0258.hdf5')
+model.load_weights('checkpoints/segmenter_vl0.0561.hdf5')
 
 imgs = [os.path.join(root, f) for root, _, files in os.walk('./tmp') for f in files if f.lower().endswith('.jpg')]
 
@@ -36,4 +36,3 @@ for imgpath in imgs:
     imsave(imgpath.replace('tmp', 'res'), result)
 
     # sudo fuser -v /dev/nvidia*
-

@@ -65,8 +65,3 @@ def getSegModel(input_shape):
     from keras.utils import plot_model
     plot_model(model, to_file='model.png')
     return model
-
-im_heigth = 8 * 40
-im_width = 16 * 40
-input_shape = (im_heigth, im_width, 1)
-model = getSegModel(input_shape)
