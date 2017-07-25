@@ -5,8 +5,8 @@ import os
 from PIL import Image, ImageFont, ImageDraw, ImageOps
 from scipy.ndimage.filters import gaussian_filter
 from multiprocessing import Pool, cpu_count
-from model import bbox_model
-from utils import rotate_coord, crop_rotate
+from sp_model import sp_model
+from utils import generateVin, rotate_coord, getLabel, vocabulary
 
 im_heigth = 9*40
 im_width = 16*40
@@ -15,6 +15,8 @@ coords_count = 5
 nb_epoch = 50
 vin_length = 17
 max_angle = 45.
+max_spaces = 0
+maxLength = vin_length+max_spaces
 
 # random backgrounds
 bcgs = []
@@ -38,7 +40,6 @@ fonts = [os.path.join(root, f) for root, _, files in os.walk('fonts/') for f in 
 
 def process(z):
 
-    alphabet = '0123456789ABCDEFGHJKLMNPRSTUVWXYZ'
     rot_coords = np.zeros((4, 2), dtype='float32')
     flips = [
         Image.FLIP_LEFT_RIGHT,
@@ -50,8 +51,10 @@ def process(z):
     ]
 
     while True:
-        vin = ''.join(random.choice(alphabet) for _ in range(vin_length))
-
+        vin = generateVin(vin_length, max_spaces)
+        if len(vin) < maxLength:
+            for i in range(maxLength - len(vin)):
+                vin +=' '
         ff = random.choice(fonts)
 
         font = ImageFont.truetype(ff, random.randint(32, 256))
@@ -93,8 +96,8 @@ def process(z):
             draw.text((0, round(t_img_size/2. - t_height/2.)), vin, font=font, fill=255)
             text_image = text_image.rotate(rot_deg)
 
-            x = random.randint(-min_tx, im_width - max_tx)
-            y = random.randint(-min_ty, im_heigth - max_ty)
+            x = random.randint(-min_tx, im_width - max_tx) #int((-min_tx + im_width-max_tx)/2)
+            y = random.randint(-min_ty, im_heigth - max_ty) #int((-min_ty + im_heigth-max_ty)/2)
 
             color = random.randint(0, 255)
 
@@ -142,7 +145,10 @@ def process(z):
             # except:
             #     print('trololo')
 
-            return [np.reshape(bcg_img, (im_heigth, im_width, 1)), c]
+            indexes, vinLen = getLabel(vin)
+
+
+            return [np.reshape(bcg_img, (im_heigth, im_width, 1)), indexes, vinLen, c]
 
 
 pool = Pool(cpu_count() // 2)
@@ -150,22 +156,35 @@ pool = Pool(cpu_count() // 2)
 
 def gen(batch_size=8):
     x = np.zeros((batch_size, im_heigth, im_width, 1), dtype='float32')
-    y = np.zeros((batch_size, coords_count), dtype='float32')
+    y = np.ones((batch_size, maxLength), dtype='int32') * -1
+
+    inputLengths = np.ones((batch_size,1), dtype='int32') * 32
+    labelLengths = np.ones((batch_size,1), dtype='int32') * vin_length
+    dummy_y = np.zeros((batch_size, 1))
+    points = np.zeros((batch_size, 5), dtype=np.float)
     while True:
         result = pool.map(process, range(batch_size))
-        #for i in range(batch_size):
-        #    v = process(i)
         for i, v in enumerate(result):
             x[i] = v[0] / 127.5 - 1
             y[i] = v[1]
+            points[i] = v[-1]
 
-        yield (x, y)
+        inputs = {'the_input': x,
+                  'the_labels': y,
+                  'input_length': inputLengths,
+                  'label_length': labelLengths,
+                  }
+        outputs = {'ctc': dummy_y,
+                   'points': points}
 
-model = bbox_model(shape=input_shape, coords_count=coords_count)
+        yield (inputs, outputs)
+
+model = sp_model(input_shape, len(vocabulary)+2)
+#model = bbox_model(shape=input_shape, coords_count=coords_count)
 # model = to_multi_gpu(model, 2)
 
-model.compile(loss="mean_squared_error", optimizer='sgd')
-#model.load_weights('checkpoints/vl0.0101.hdf5')
+#model.compile(loss="mean_squared_error", optimizer='sgd')
+#model.load_weights('checkpoints/spatial_transformer_vl0.5295.hdf5')
 model.summary()
 
 model.fit_generator(generator=gen(),
@@ -176,6 +195,6 @@ model.fit_generator(generator=gen(),
                     max_q_size=100,
                     callbacks=[
                         callbacks.ModelCheckpoint(
-                            'checkpoints/vl{val_loss:.4f}.hdf5',
+                            'checkpoints/spatial_transformer_vl{val_loss:.4f}.hdf5',
                             monitor='val_loss')
                     ])

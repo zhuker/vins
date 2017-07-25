@@ -8,7 +8,7 @@ from multiprocessing import Pool, cpu_count
 from segmentmodel import getSegModel
 from utils import generateVin, rotate_coord, getLabel, vocabulary
 
-im_heigth = 9 * 40
+im_heigth = 8 * 40
 im_width = 16 * 40
 input_shape = (im_heigth, im_width, 1)
 coords_count = 5
@@ -131,7 +131,7 @@ def process(z):
 pool = Pool(cpu_count() // 2)
 
 
-def gen(batch_size=1):
+def gen(batch_size=4):
     x = np.zeros((batch_size, im_heigth, im_width, 1), dtype='float32')
     y = np.zeros((batch_size, im_heigth, im_width, 1), dtype=np.float)
 
@@ -150,7 +150,7 @@ model.summary()
 
 model.fit_generator(generator=gen(),
                     validation_data=gen(),
-                    steps_per_epoch=3000,
+                    steps_per_epoch=300,
                     validation_steps=100,
                     epochs=nb_epoch,
                     max_q_size=100,
