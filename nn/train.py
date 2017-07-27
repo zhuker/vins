@@ -110,8 +110,8 @@ def process(z):
             sigma = random.uniform(0, 2)
             bcg_img = gaussian_filter(bcg_img, sigma)
 
-            # from scipy.misc import imsave
-            # imsave('tmp/%s_%s_%s.jpg' % (vin, x, y), bcg_img)
+            from scipy.misc import imsave
+            imsave('tmp/%s_%s_%s.jpg' % (vin, x, y), bcg_img)
 
             bcg_img = np.array(bcg_img, dtype='uint8')
 
@@ -148,7 +148,7 @@ def process(z):
             indexes, vinLen = getLabel(vin)
 
 
-            return [np.reshape(bcg_img, (im_heigth, im_width, 1)), indexes, vinLen, c]
+            #return [np.reshape(bcg_img, (im_heigth, im_width, 1)), indexes, vinLen, c]
 
 
 pool = Pool(cpu_count() // 2)
@@ -177,7 +177,7 @@ def gen(batch_size=8):
         outputs = {'ctc': dummy_y,
                    'points': points}
 
-        yield (inputs, outputs)
+        #yield (inputs, outputs)
 
 model = sp_model(input_shape, len(vocabulary)+2)
 #model = bbox_model(shape=input_shape, coords_count=coords_count)
