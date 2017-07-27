@@ -18,6 +18,13 @@ def generateVin(vin_len, max_spaces):
     return vin.strip()
 
 
+def generate_timecode():
+    s = ('%02d:%02d:%02d' + random.choice(':;') + '%02d') % \
+        (random.randint(0, 99), random.randint(0, 59), random.randint(0, 59), random.randint(0, 99))
+
+    return s
+
+
 def getLabel(vin):
     Y = [vocabulary.index(char) for char in vin]
     return Y, len(vin)
