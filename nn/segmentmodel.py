@@ -7,21 +7,7 @@ import numpy as np
 from spatialTransformer import SpatialTransformer
 import keras.backend as K
 
-def getSegModel(input_shape):
-    # model = Sequential()
-    # model.add(Conv2D(32, kernel_size=3,  activation='relu', padding='same', input_shape=input_shape))
-    # model.add(MaxPooling2D(2,2))
-    # model.add(Conv2D(64, kernel_size=3, activation='relu', padding='same'))
-    # model.add(MaxPooling2D(2,2))
-    # model.add(Conv2D(64, kernel_size=3, activation='relu', padding='same'))
-    # model.add(MaxPooling2D(2,2))
-    # model.add(Conv2D(128, kernel_size=3,  activation='relu', padding='same'))
-    # model.add(Deconv2D(128, kernel_size=4, strides=2, activation='relu', padding='same'))
-    # model.add(Deconv2D(128, kernel_size=4, strides=2, activation='relu', padding='same'))
-    # model.add(Deconv2D(64, kernel_size=4, strides=2, activation='relu', padding='same'))
-    # model.add(Conv2D(1, kernel_size=3,  activation='sigmoid', padding='same'))
-    # model.compile('adam', 'binary_crossentropy')
-
+def getSegModel(input_shape, compile=True):
     inp = Input(input_shape)
 
     c1 = LeakyReLU(alpha=0.2)(BatchNormalization()(Conv2D(32, kernel_size=3,  activation='linear', padding='same')(inp)))
@@ -59,9 +45,13 @@ def getSegModel(input_shape):
     out = Conv2D(1, kernel_size=3,  activation='sigmoid', padding='same')(concat1)
 
     model = Model(input=inp, output=out)
-    model.compile('adam', 'binary_crossentropy')
-    model.summary()
+    if compile:
+        model.compile('adam', 'binary_crossentropy')
+        model.summary()
 
-    from keras.utils import plot_model
-    plot_model(model, to_file='model.png')
+        from keras.utils import plot_model
+        plot_model(model, to_file='model.png')
+    else:
+        #model.load_weights('checkpoints/segmenter_vl0.0163.hdf5', by_name=True)
+        return model
     return model
