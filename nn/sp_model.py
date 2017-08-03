@@ -52,8 +52,8 @@ def OcrModel():
     model = Model(input=inp, output=out)
     model.load_weights('checkpoints/OCRmodel_vl0.7638.hdf5')
 
-    for layer in model.layers:
-        layer.trainable = False
+    # for layer in model.layers:
+    #     layer.trainable = False
 
     return model
 
@@ -83,6 +83,8 @@ def locnetWithMask(input_shape):
 
     locnet.load_weights('checkpoints/LOCNET_vl0.0469.hdf5')
     locnet.compile('adam', 'mse')
+    for layer in locnet.layers:
+        layer.trainable = False
     locnet.summary()
     return  locnet
 
@@ -107,10 +109,10 @@ def getlocnet(input_shape):
 
     locnet = Model(input=inp, output=x)
 
-    #locnet.load_weights('checkpoints/LOCNET_vl0.0574.hdf5')
+    locnet.load_weights('checkpoints/LOCNET_0.0020.hdf5')
     locnet.compile('adam', 'mse')
-    # for layer in locnet.layers[:-3]:
-    #     layer.trainable = False
+    for layer in locnet.layers:
+        layer.trainable = False
     return locnet
 
 def locnet_and_sp_mask(input_shape):
@@ -155,7 +157,7 @@ def sp_model(shape, retunCrop=False):
     transformedInputSize = (32, 16 * 32, 1)
 
     inp = Input(shape)
-    locnet_output = locnetWithMask(shape)
+    locnet_output = getlocnet(shape)
     transformedInput = SpatialTransformer(localization_net=locnet_output, output_size=transformedInputSize[:2],
                                           input_shape=shape)(inp)
     ocrOutput = ocrModel(transformedInput)

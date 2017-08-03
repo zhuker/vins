@@ -216,7 +216,7 @@ def process(z):
 
 
 pool = Pool(cpu_count() // 2)
-def gen(batch_size=1):
+def gen(batch_size=4):
     z=0
     x = np.zeros((batch_size, im_heigth, im_width, 1), dtype='float32')
     y = np.zeros((batch_size, 17, len(vocabulary)))
@@ -240,10 +240,10 @@ def gen(batch_size=1):
         #
         # cv2.imwrite('res/'+str(z)+'.jpg', np.vstack((crop,img)))
         # z+=1
-        yield (x, matrix)
+        yield (x, y)
 
 
-model =  getlocnet(input_shape)#locnetWithMask(input_shape)#locnet_on_mask(input_shape), locnet_on_mask(input_shape)
+model =  sp_model(input_shape)#locnetWithMask(input_shape)#locnet_on_mask(input_shape), locnet_on_mask(input_shape)
 #model.load_weights('checkpoints/LOCNET_vl0.4530.hdf5')
 #model.compile('adam', 'mse')
 #model.load_weights('checkpoints/LOCNET_vl0.4052.hdf5')
@@ -262,6 +262,6 @@ model.fit_generator(generator=gen(),
                     max_q_size=100,
                     callbacks=[
                         callbacks.ModelCheckpoint(
-                            'checkpoints/LOCNET_{val_loss:.4f}.hdf5',
+                            'checkpoints/endToEnd{val_loss:.4f}.hdf5',
                             monitor='val_loss')
                     ])

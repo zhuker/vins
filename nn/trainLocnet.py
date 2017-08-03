@@ -5,25 +5,27 @@ import os
 from PIL import Image, ImageFont, ImageDraw, ImageOps
 from scipy.ndimage.filters import gaussian_filter
 from multiprocessing import Pool, cpu_count
-from sp_model import sp_model, locnet_on_mask, getlocnet, testMatrixModel
+from sp_model import locnet_and_sp_mask,locnetWithMask, sp_model, locnet_on_mask, getlocnet, testMatrixModel
 from utils import generateVin, rotate_coord, getLabel, vocabulary
 import cv2
 
-im_heigth = 9 * 40
+im_heigth = 8 * 40
 im_width = 16 * 40
 input_shape = (im_heigth, im_width, 1)
 coords_count = 5
 nb_epoch = 500
 vin_length = 17
-max_angle = 45
+max_angle = 35
 max_spaces = 0
 maxLength = vin_length + max_spaces
 
+height_padding = 0.0
+width_padding = 0.0
 # random backgrounds
 bcgs = []
 bcgs_path = '/DATA/cars/'
 
-
+#testMatrixModel = testMatrixModel()
 if True:
     bcgs = [os.path.join(root, f) for root, _, files in os.walk(bcgs_path) for f in files if f.endswith('.jpg')]
 
@@ -55,7 +57,7 @@ def order_points(pts):
 def getMatrix(pts):
     rect = pts.astype(np.float32)
 
-    origHeight = 9 * 40
+    origHeight = 8 * 40
     origWidth = 16 * 40
 
     dst = np.array([
@@ -100,9 +102,11 @@ def process(z):
         ff = random.choice(fonts)
 
         font = ImageFont.truetype(ff, random.randint(32, 256))
-        t_width, t_height = font.getsize(vin)
-
+        t_width, t_height_orig = font.getsize(vin)
+        t_height = t_height_orig#int(t_height_orig * (1 + height_padding))
+       # t_width = int(t_width * (1 + width_padding))
         # text image is a square
+
         t_img_size = max(t_height, t_width)
 
         # rot_deg = random.uniform(0, 360)
@@ -135,7 +139,7 @@ def process(z):
 
             text_image = Image.new('L', (t_img_size, t_img_size))
             draw = ImageDraw.Draw(text_image)
-            draw.text((0, round(t_img_size / 2. - t_height / 2.)), vin, font=font, fill=255)
+            draw.text((t_width*width_padding/2, round(t_img_size / 2. - t_height_orig / 2.)), vin, font=font, fill=255)
             text_image = text_image.rotate(rot_deg)
 
             x = random.randint(-min_tx, im_width - max_tx)  # int((-min_tx + im_width-max_tx)/2)
@@ -152,6 +156,13 @@ def process(z):
             sigma = random.uniform(0, 2)
             bcg_img = gaussian_filter(bcg_img, sigma)
 
+            totalmask = Image.new('L', (im_width, im_heigth))
+            colorization = ImageOps.colorize(text_image, (0, 0, 0), (255, 255, 255))
+            totalmask.paste(colorization, (x, y), text_image)
+            totalmask = np.array(totalmask, dtype=np.float)
+            totalmask[totalmask > 0] = 1
+            totalmask = np.expand_dims(totalmask, axis=-1)
+
             # from scipy.misc import imsave
             # imsave('tmp/%s_%s_%s.jpg' % (vin, x, y), bcg_img)
 
@@ -159,12 +170,16 @@ def process(z):
 
             rot_coords[:] += [x, y]
 
-            mask = Image.new('L', (32*16, 32))
+            mask = Image.new('L', (t_width, t_height_orig))
             draw = ImageDraw.Draw(mask)
-            font.size =32
             draw.text((0,0), vin, font=font, fill=255)
-            mask = np.array(mask, dtype=np.float)
-            mask[mask > -1] = 1
+
+            mask = cv2.resize(np.array(mask, dtype=np.float),(32*16, 32))
+
+            # from scipy.misc import imsave
+            # imsave('res/%s_%s_%s.jpg' % (vin, x, y), mask.astype(np.uint8))
+
+            mask[mask > 0] = 1
             mask = np.expand_dims(mask, axis=-1)
 
 
@@ -197,23 +212,26 @@ def process(z):
 
             # crop = cv2.warpAffine(bcg_img, matrix, (1000, 1000))
             # cv2.imwrite('temp_crop.png',crop)
-            return np.reshape(bcg_img, (im_heigth, im_width, 1)), label, mask, matrix.flatten()
+            return np.reshape(bcg_img, (im_heigth, im_width, 1)), label, mask, matrix.flatten(), totalmask
 
 
 pool = Pool(cpu_count() // 2)
-
-def gen(batch_size=4):
+def gen(batch_size=1):
+    z=0
     x = np.zeros((batch_size, im_heigth, im_width, 1), dtype='float32')
     y = np.zeros((batch_size, 17, len(vocabulary)))
     masks = np.zeros((batch_size, 32, 32*16, 1))
     matrix = np.zeros((batch_size, 6))
+    totalMasks = np.zeros((batch_size, im_heigth, im_width, 1), dtype='float32')
     while True:
-        result = pool.map(process, range(batch_size))
+        result = map(process, range(batch_size))
         for i, v in enumerate(result):
             x[i] = v[0] / 127.5 - 1
             y[i] = v[1]
             masks[i] = v[2]
             matrix[i] = v[3]
+            totalMasks[i] = v[4]
+        #     x[i][0,:6,0] = v[3]
         # crop = testMatrixModel.predict(x)[0]
         # crop += 1
         # crop *= 127.5
@@ -225,17 +243,17 @@ def gen(batch_size=4):
         yield (x, matrix)
 
 
-
-model =  getlocnet(input_shape)#, locnet_on_mask(input_shape)
+model =  getlocnet(input_shape)#locnetWithMask(input_shape)#locnet_on_mask(input_shape), locnet_on_mask(input_shape)
+#model.load_weights('checkpoints/LOCNET_vl0.4530.hdf5')
 #model.compile('adam', 'mse')
-#model.load_weights('checkpoints/endToEnd_vl0.0747.hdf5')
+#model.load_weights('checkpoints/LOCNET_vl0.4052.hdf5')
 
 # model = bbox_model(shape=input_shape, coords_count=coords_count)
 # model = to_multi_gpu(model, 2)
 
 # model.compile(loss="mean_squared_error", optimizer='sgd')
-model.summary()
 
+#model.load_weights('./checkpoints/LOCNET_0.0118.hdf5')
 model.fit_generator(generator=gen(),
                     validation_data=gen(),
                     steps_per_epoch=3000,
@@ -244,6 +262,6 @@ model.fit_generator(generator=gen(),
                     max_q_size=100,
                     callbacks=[
                         callbacks.ModelCheckpoint(
-                            'checkpoints/LOCNET_vl{val_loss:.4f}.hdf5',
+                            'checkpoints/LOCNET_{val_loss:.4f}.hdf5',
                             monitor='val_loss')
                     ])
