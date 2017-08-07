@@ -44,7 +44,7 @@ for imgpath in imgs:
         crop = res[1][0]
         crop = (crop +1.) *127.5
         crop = crop.astype(np.uint8)[:, :, 0]
-        #
+
         # mask = res[2][0]
         # mask = mask * 255
         # mask = mask.astype(np.uint8)[:, :, 0]

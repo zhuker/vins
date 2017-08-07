@@ -7,6 +7,9 @@ import numpy as np
 from spatialTransformer import SpatialTransformer
 import keras.backend as K
 
+import os
+currPath = os.path.dirname(os.path.abspath(__file__))
+
 def getSegModel(input_shape, compile=True):
     inp = Input(input_shape)
 
@@ -49,8 +52,9 @@ def getSegModel(input_shape, compile=True):
         model.compile('adam', 'binary_crossentropy')
         model.summary()
 
-        from keras.utils import plot_model
-        plot_model(model, to_file='model.png')
+        # from keras.utils import plot_model
+        # plot_model(model, to_file='model.png')
+        model.load_weights(currPath+'/checkpoints/segmenter_vl0.0163.hdf5', by_name=True)
     else:
         #model.load_weights('checkpoints/segmenter_vl0.0163.hdf5', by_name=True)
         return model
