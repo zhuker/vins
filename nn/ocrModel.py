@@ -9,6 +9,9 @@ import keras.backend as K
 from utils import vocabulary
 from keras.layers.wrappers import TimeDistributed
 
+import os
+currPath = os.path.dirname(os.path.abspath(__file__))
+
 def getOCRModel():
 
     inp = Input((32,32*16,1))
@@ -47,9 +50,10 @@ def getOCRModel():
     model = Model(input=inp, output=out)
     model.compile('adam', 'categorical_crossentropy')
     model.summary()
+    model.load_weights(currPath+'/checkpoints/OCRmodel_vl0.7638.hdf5')
 
-    from keras.utils import plot_model
-    plot_model(model, to_file='model.png')
+    # from keras.utils import plot_model
+    # plot_model(model, to_file='model.png')
     return model
 
 
