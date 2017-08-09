@@ -1,4 +1,4 @@
-from keras.layers import Input, Reshape, Dense, Deconv2D, Convolution2D,Conv2D, Conv1D, LSTM, Bidirectional, Dropout, BatchNormalization, MaxPooling2D
+from keras.layers import Input, Reshape, Dense, Deconv2D, Activation,concatenate,Convolution2D,Conv2D, Conv1D, LSTM, Bidirectional, Dropout, BatchNormalization, MaxPooling2D
 from keras.models import Model
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.wrappers import TimeDistributed
@@ -73,9 +73,12 @@ def timecode_ocr_model_small():
     c7 = LeakyReLU(alpha=0.1)(BatchNormalization()(Convolution2D(128, kernel_size=3, padding='same')(m6)))
     resh = Reshape((11, 128))(c7)
     drop = Dropout(0.5)(resh)
-    lstm = Bidirectional(LSTM(128, return_sequences=True))(drop)
-    drop2 = Dropout(0.25)(lstm)
-    out = TimeDistributed(Dense(12, activation='softmax'))(drop2)
+    lstm1 = LSTM(64, return_sequences=True)(drop)
+    drop2 = Dropout(0.25)(concatenate([lstm1,resh], axis=-1))
+    resh2 = Reshape((1,11, 128+64))(drop2)
+    out = Convolution2D(12, kernel_size=1, padding='same', activation='linear')(resh2)
+    out = Reshape((11,12))(out)
+    out = Activation('softmax')(out)
 
     model = Model(input=inp, output=out)
     model.compile('adam', 'categorical_crossentropy')
@@ -83,4 +86,4 @@ def timecode_ocr_model_small():
 
     return model
 
-timecode_ocr_model_small().summary()
+# timecode_ocr_model_small().summary()
