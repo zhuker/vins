@@ -6,11 +6,11 @@ from PIL import Image, ImageFont, ImageDraw
 from scipy.ndimage.filters import gaussian_filter
 from multiprocessing import cpu_count
 from multiprocessing.pool import ThreadPool
-from segmentmodel import getSegModel
+from segmentmodel import getSegConvModel
 # from model import bbox_model
 # from scipy.misc import imsave
 from utils import generate_timecode, generateVin
-
+import cv2
 im_height = 8 * 40
 im_width = 16 * 40
 input_shape = (im_height, im_width, 1)
@@ -20,7 +20,7 @@ extra_pixels = 5
 
 # random backgrounds
 bcgs = []
-bcgs_path = '../../SUN_bcgs/'
+bcgs_path = '/DATA/cocostuf/images/'
 
 if True:
     bcgs = [os.path.join(root, f) for root, _, files in os.walk(bcgs_path) for f in files if f.endswith('.jpg')]
@@ -33,7 +33,7 @@ else:
         bcgs = f.readlines()
     bcgs = [b.strip() for b in bcgs]
 
-fonts = [os.path.join(root, f) for root, _, files in os.walk('monospaced/') for f in files if f.endswith('.ttf')]
+fonts = [os.path.join(root, f) for root, _, files in os.walk('fonts/') for f in files if f.endswith('.ttf')]
 
 
 def process(z):
@@ -112,7 +112,8 @@ def process(z):
             # return [bcg_img, c]
 
             # imsave('tc_tmp/%s_%s_%s.jpg' % (tc, x, y), bcg_img)
-
+            # cv2.imwrite('res/%s_%s_%s.jpg' % (tc, x, y), bcg_img)
+            # cv2.imwrite('res/%s_%s_%s_mask.jpg' % (tc, x, y), mask*255)
             mask = np.packbits(np.asarray(mask, dtype='bool'), axis=-1)
             return [bcg_img, mask]
 
@@ -136,13 +137,13 @@ def gen(batch_size=12):
 
 
 # model = bbox_model(input_shape, 4)
-model = getSegModel(input_shape)
+model = getSegConvModel(input_shape)
 # model = make_parallel(model, 2)
 model.compile('adam', 'binary_crossentropy')
 # model.compile('adam', 'mse')
 
 model.summary()
-model.load_weights('checkpoints/tc_segmenter_vl0.0022.hdf5')
+#model.load_weights('checkpoints/tc_segmenter_vl0.0022.hdf5')
 
 print(len(fonts), len(bcgs))
 

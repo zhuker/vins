@@ -5,7 +5,7 @@ import tornado.httpserver, tornado.ioloop, tornado.options, tornado.web, os.path
 import tornado.httpserver
 from tornado.options import define, options
 import numpy as np
-from nn.maskOcrModel import MaskOcrModel
+from nn.maskOcrModelTimecodes import MaskOcrModel
 
 def load_img(path,target_size=None):
     from PIL import Image
