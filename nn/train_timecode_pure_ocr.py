@@ -4,7 +4,7 @@ import random
 import os
 from PIL import Image, ImageFont, ImageDraw
 from scipy.ndimage.filters import gaussian_filter
-from timecode_ocr_model import timecode_ocr_model
+from timecode_ocr_model import timecode_ocr_model_small
 from utils import generate_timecode
 from multiprocessing import cpu_count
 from multiprocessing.pool import ThreadPool
@@ -14,7 +14,7 @@ from scipy.misc import imsave
 vocabulary = '0123456789:;'
 
 im_height = 32
-im_width = 32*16
+im_width = 32*11
 nb_epoch = 100
 BATCH_SIZE = 8
 
@@ -136,8 +136,8 @@ def gen(batch_size=1):
 
         yield (x, y)
 
-model = timecode_ocr_model()
-model.load_weights('checkpoints/OCRmodel_vl0.1468.hdf5')
+model = timecode_ocr_model_small()
+#model.load_weights('checkpoints/OCRmodel_vl0.1468.hdf5')
 # model.summary()
 
 model.fit_generator(generator=gen(batch_size=BATCH_SIZE),
