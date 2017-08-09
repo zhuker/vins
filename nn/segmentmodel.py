@@ -106,3 +106,41 @@ def getSegConvModel(input_shape, compile=True):
         #model.load_weights('checkpoints/segmenter_vl0.0163.hdf5', by_name=True)
         return model
     return model
+
+
+def getSegConvModelNopool(input_shape, compile=True):
+    inp = Input(input_shape)
+
+    c1 = LeakyReLU(alpha=0.2)(BatchNormalization()(Conv2D(32, kernel_size=3,  activation='linear', padding='same')(inp)))
+
+    c2 = LeakyReLU(alpha=0.2)(BatchNormalization()(Conv2D(32, kernel_size=3,  activation='linear', padding='same')(c1)))
+
+    c3 = LeakyReLU(alpha=0.2)(BatchNormalization()(Conv2D(32, kernel_size=3,  activation='linear', padding='same')(c2)))
+
+    c4 = LeakyReLU(alpha=0.2)(BatchNormalization()(Conv2D(32, kernel_size=3,  activation='linear', padding='same')(c3)))
+
+    c5 = LeakyReLU(alpha=0.2)(BatchNormalization()(Conv2D(32, kernel_size=3,  activation='linear', padding='same')(c4)))
+
+    concat1 = concatenate([c5, c4], axis=-1)
+    d4 = LeakyReLU(alpha=0.2)(BatchNormalization()(Conv2D(32, kernel_size=3,  activation='linear', padding='same')(concat1)))
+
+    concat2 = concatenate([d4, c3], axis=-1)
+    d3 = LeakyReLU(alpha=0.2)(BatchNormalization()(Conv2D(32, kernel_size=3,  activation='linear', padding='same')(concat2)))
+
+    concat3 = concatenate([d3, c2], axis=-1)
+    d2 = LeakyReLU(alpha=0.2)(BatchNormalization()(Conv2D(32, kernel_size=3,  activation='linear', padding='same')(concat3)))
+
+    out = Conv2D(1, kernel_size=3,  activation='sigmoid', padding='same')(d2)
+
+    model = Model(input=inp, output=out)
+    if compile:
+        model.compile('adam', 'binary_crossentropy')
+        model.summary()
+
+        # from keras.utils import plot_model
+        # plot_model(model, to_file='model.png')
+        #model.load_weights(currPath+'/checkpoints/segmenter_vl0.0163.hdf5', by_name=True)
+    else:
+        #model.load_weights('checkpoints/segmenter_vl0.0163.hdf5', by_name=True)
+        return model
+    return model
