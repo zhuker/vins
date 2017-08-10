@@ -72,12 +72,12 @@ def timecode_ocr_model_small():
 
     c7 = LeakyReLU(alpha=0.1)(BatchNormalization()(Convolution2D(128, kernel_size=3, padding='same')(m6)))
     resh = Reshape((11, 128))(c7)
-    drop = Dropout(0.5)(resh)
+    drop = Dropout(0.25)(resh)
     lstm1 = LSTM(64, return_sequences=True)(drop)
-    drop2 = Dropout(0.25)(concatenate([lstm1,resh], axis=-1))
-    resh2 = Reshape((1,11, 128+64))(drop2)
-    out = Convolution2D(12, kernel_size=1, padding='same', activation='linear')(resh2)
-    out = Reshape((11,12))(out)
+    drop2 = Dropout(0.25)(concatenate([lstm1, resh], axis=-1))
+    resh2 = Reshape((1, 11, 128+64))(drop2)
+    out = Convolution2D(12, kernel_size=1, padding='same')(resh2)
+    out = Reshape((11, 12))(out)
     out = Activation('softmax')(out)
 
     model = Model(input=inp, output=out)
@@ -86,4 +86,4 @@ def timecode_ocr_model_small():
 
     return model
 
-# timecode_ocr_model_small().summary()
+timecode_ocr_model_small().summary()

@@ -6,7 +6,7 @@ from PIL import Image, ImageFont, ImageDraw
 from scipy.ndimage.filters import gaussian_filter
 from multiprocessing import cpu_count
 from multiprocessing.pool import ThreadPool
-from segmentmodel import getSegConvModel
+from segmentmodel import getSegConvModelNopool
 # from model import bbox_model
 # from scipy.misc import imsave
 from utils import generate_timecode, generateVin
@@ -14,13 +14,17 @@ import cv2
 im_height = 8 * 40
 im_width = 16 * 40
 input_shape = (im_height, im_width, 1)
+
+mask_width = 80
+mask_height = 40
+
 nb_epoch = 50
 y_coef = 0.1  # position of timecode from top or bottom
 extra_pixels = 5
 
 # random backgrounds
 bcgs = []
-bcgs_path = '/DATA/cocostuf/images/'
+bcgs_path = '../../bcgs/'
 
 if True:
     bcgs = [os.path.join(root, f) for root, _, files in os.walk(bcgs_path) for f in files if f.endswith('.jpg')]
@@ -33,7 +37,7 @@ else:
         bcgs = f.readlines()
     bcgs = [b.strip() for b in bcgs]
 
-fonts = [os.path.join(root, f) for root, _, files in os.walk('fonts/') for f in files if f.endswith('.ttf')]
+fonts = [os.path.join(root, f) for root, _, files in os.walk('monospaced/') for f in files if f.endswith('.ttf')]
 
 
 def process(z):
@@ -70,7 +74,6 @@ def process(z):
                 y = random.randint(im_height * (1 - y_coef), im_height - t_height)
 
             bcg_img = bcg_img.rotate(random.uniform(0, 360))
-            draw = ImageDraw.Draw(bcg_img)
 
             # random nuisance text
             for i in range(random.randint(0, 3)):
@@ -102,7 +105,8 @@ def process(z):
             mask = Image.new('L', (im_width, im_height))
             draw = ImageDraw.Draw(mask)
             draw.text((x, y), tc, font=font, fill=255)
-            mask = np.array(mask, dtype=np.float)
+
+            mask = cv2.resize(np.array(mask, dtype=np.float), (mask_width, mask_height), interpolation=cv2.INTER_NEAREST)
             mask[mask > 0] = 1
 
             bcg_img = np.array(bcg_img, dtype='uint8')
@@ -118,16 +122,15 @@ def process(z):
             return [bcg_img, mask]
 
 
-pool = ThreadPool(cpu_count() // 2)
+pool = ThreadPool(max(cpu_count() // 2, 4))
 
 
-def gen(batch_size=12):
+def gen(batch_size=8):
     x = np.zeros((batch_size, im_height, im_width, 1), dtype='float32')
-    y = np.zeros((batch_size, im_height, im_width, 1), dtype=np.float)
-    # y = np.zeros((batch_size, 4))
+    y = np.zeros((batch_size, mask_height, mask_width, 1), dtype=np.float)
 
     while True:
-        result = pool.map(process, range(batch_size))
+        result = map(process, range(batch_size))
         for i, v in enumerate(result):
             x[i, :, :, 0] = v[0] / 127.5 - 1
             y[i, :, :, 0] = np.unpackbits(v[1], axis=-1)
@@ -137,7 +140,7 @@ def gen(batch_size=12):
 
 
 # model = bbox_model(input_shape, 4)
-model = getSegConvModel(input_shape)
+model = getSegConvModelNopool(input_shape)
 # model = make_parallel(model, 2)
 model.compile('adam', 'binary_crossentropy')
 # model.compile('adam', 'mse')

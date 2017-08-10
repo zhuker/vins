@@ -16,7 +16,7 @@ vocabulary = '0123456789:;'
 im_height = 32
 im_width = 32*11
 nb_epoch = 100
-BATCH_SIZE = 8
+BATCH_SIZE = 64
 
 tc_len = 11
 
@@ -114,7 +114,7 @@ def process(z):
         return [bcg_img, tc]
 
 
-pool = ThreadPool(cpu_count() // 2)
+pool = ThreadPool(max(cpu_count() // 2, 4))
 
 
 def getLabel(s):
@@ -124,7 +124,7 @@ def getLabel(s):
     return label
 
 
-def gen(batch_size=1):
+def gen(batch_size=32):
     x = np.zeros((batch_size, im_height, im_width, 1), dtype=np.float)
     y = np.zeros((batch_size, tc_len, len(vocabulary)))
 
@@ -137,12 +137,12 @@ def gen(batch_size=1):
         yield (x, y)
 
 model = timecode_ocr_model_small()
-#model.load_weights('checkpoints/OCRmodel_vl0.1468.hdf5')
-# model.summary()
+model.load_weights('checkpoints/OCRmodel_vl0.1142.hdf5')
+model.summary()
 
 model.fit_generator(generator=gen(batch_size=BATCH_SIZE),
                     validation_data=gen(batch_size=BATCH_SIZE),
-                    steps_per_epoch=3000,
+                    steps_per_epoch=1000,
                     validation_steps=100,
                     epochs=nb_epoch,
                     max_q_size=100,

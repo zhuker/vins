@@ -1,16 +1,15 @@
 import numpy as np
 import sys
-import cv2
+import cv2 as cv2
 import math
 from copy import deepcopy
+from scipy import stats
+
 
 try:
     import Image
 except ImportError:
     from PIL import Image
-# pytesseract is a python library for tesseract
-import pytesseract
-
 
 def order_points(pts):
     # initialzie a list of coordinates that will be ordered
@@ -104,6 +103,7 @@ def crop_minAreaRect(img, rect):
 
     return img_crop
 
+
 def adjust(img, mask):
     # thresholding and inversion of image for further processing.
     # handy for controur extraction
@@ -111,29 +111,12 @@ def adjust(img, mask):
         ret, thresh = cv2.threshold(img, 100, 255, cv2.THRESH_BINARY_INV)
         return thresh
 
-        return th3
-
     # dilation over a thresholded image would cause any word to pixelate into one contour
     def dilat(img):
         kernel = np.ones((5, 5), np.uint8)
-        #kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (b, b))
-        #result = cv2.dilate(img, kernel, iterations=1)
         result = cv2.morphologyEx(img, cv2.MORPH_OPEN, kernel)
-        #result = cv2.morphologyEx(result, cv2.MORPH_CLOSE, kernel)
         return result
 
-    # CLAHE histogram equalization to improve contrast
-    def clhe(img):
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-        cl1 = clahe.apply(img)
-        return cl1
-
-    # global histogram equalization
-    def he(img):
-        equ = cv2.equalizeHist(img)
-        return equ
-
-    #temp = dilat(threshinv(clhe(img)))
     mask = dilat(threshinv(mask))
     image, contours, hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -142,18 +125,16 @@ def adjust(img, mask):
     ymin = 100000
     ymax = 0
     havg = 0
-    wordsctr = 0
     thetaavg = 0
     total_a = 0
     maxAreaBox = None
     maxArea = 0
-    maxCnt = None
     allCnt = None
     for cnt in contours:
         cnt_area = cv2.contourArea(cnt)
         a = img.size / max(0.001, cnt_area)
 
-        if (a > 2 and a < 3000):
+        if a > 2 and a < 3000:
             x, y, w, h = cv2.boundingRect(cnt)
             if x < xmin:
                 xmin = x
@@ -166,10 +147,9 @@ def adjust(img, mask):
             havg = havg + h*a
             rect = cv2.minAreaRect(cnt)
 
-            if cnt_area > maxArea :
+            if cnt_area > maxArea:
                 maxAreaBox = deepcopy(rect)
                 maxArea = cnt_area
-                maxCnt = cnt.copy()
 
             if type(allCnt) is np.ndarray:
                 allCnt = np.concatenate((allCnt, cnt))
@@ -178,17 +158,10 @@ def adjust(img, mask):
 
             box = cv2.boxPoints(rect)
             box = np.int0(box)
-            mask = cv2.drawContours(mask, [box], 0, (180,180,180), 2)
+            mask = cv2.drawContours(mask, [box], 0, (180, 180, 180), 2)
 
             # assuming that user does not rotate more than 45 degrees
             total_a += a
-            if (rect[2]) < -60:
-                thetaavg = thetaavg + (115 + rect[2])*a
-            elif (rect[2]) > 60:
-                thetaavg = thetaavg - (115 + rect[2])*a
-            else:
-                thetaavg = thetaavg + (rect[2])*a
-
 
     # havg is the average height of text
     # similar method can be used for getting average theta(using minimum bounding box along with boundingbox) for rotation and then rotating accordingly
@@ -204,12 +177,14 @@ def adjust(img, mask):
         lefty = int((-x * vy / vx) + y)
         righty = int(((cols - x) * vy / vx) + y)
 
+        print(cols-1, righty, lefty)
+
         mask = cv2.line(mask, (cols - 1, righty), (0, lefty), (127, 127, 127), 2)
 
         a = np.array([cols - 1, righty])
         b = np.array([0, lefty])
         nearPoints = []
-        coords = np.array(np.where(mask < 127)).transpose()[:,::-1]
+        coords = np.array(np.where(mask < 127)).transpose()[:, ::-1]
         for p in coords:
             d = np.linalg.norm(np.cross(b - a, a - p)) / np.linalg.norm(b - a)
             if d <= height/2.:
@@ -228,22 +203,110 @@ def adjust(img, mask):
         box = np.int0(box)
         mask = cv2.drawContours(mask, [box], 0, (0, 0, 0), 2)
         output = four_point_transform(img, box)
-        #cv2.imwrite('tempmask.png', mask)
-        #cv2.imwrite('tempcut.png', output)
+        # cv2.imwrite('tempmask.png', mask)
+        # cv2.imwrite('tempcut.png', output)
 
         return output, mask
     else:
         return img, mask
 
 
-# img = cv2.imread('rotate2.jpg', 0)
-# img1 = total(img)
-# cv2.imwrite('temp.jpg', img1)
-# im = Image.open('temp.jpg')
-# im.load()
-# text = pytesseract.image_to_string(im)
-# print text
-# # np.savetxt('book.txt',text)
-# f = open('book.txt', 'w')
-# f.write(text)
-# f.close()
+def adjust_horizontal(img, mask):
+    # thresholding and inversion of image for further processing.
+    # handy for controur extraction
+    def threshinv(img):
+        ret, thresh = cv2.threshold(img, 100, 255, cv2.THRESH_BINARY_INV)
+        return thresh
+
+    # dilation over a thresholded image would cause any word to pixelate into one contour
+    def dilat(img):
+        kernel = np.ones((5, 5), np.uint8)
+        result = cv2.morphologyEx(img, cv2.MORPH_OPEN, kernel)
+        return result
+
+    # cv2.imwrite('tmp_ormask.jpg', mask)
+
+    mask = dilat(threshinv(mask))
+    image, contours, hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+    xmax = 0
+    xmin = 100000
+    ymin = 100000
+    ymax = 0
+    havg = 0
+    maxAreaBox = None
+    maxArea = 0
+    allCnt = None
+    for cnt in contours:
+        cnt_area = cv2.contourArea(cnt)
+        a = img.size / max(0.001, cnt_area)
+
+        if (a > 2 and a < 3000):
+            x, y, w, h = cv2.boundingRect(cnt)
+            if x < xmin:
+                xmin = x
+            if y < ymin:
+                ymin = y
+            if x + w > xmax:
+                xmax = x + w
+            if y + h > ymax:
+                ymax = y + h
+            havg = havg + h * a
+            rect = cv2.minAreaRect(cnt)
+
+            if cnt_area > maxArea:
+                maxAreaBox = deepcopy(rect)
+                maxArea = cnt_area
+
+            if type(allCnt) is np.ndarray:
+                allCnt = np.concatenate((allCnt, cnt))
+            else:
+                allCnt = cnt.copy()
+
+            box = cv2.boxPoints(rect)
+            box = np.int0(box)
+            mask = cv2.drawContours(mask, [box], 0, (180, 180, 180), 2)
+
+    # havg is the average height of text
+    # similar method can be used for getting average theta(using minimum bounding box along with boundingbox) for rotation and then rotating accordingly
+    if maxAreaBox != None:
+        box = cv2.boxPoints(maxAreaBox)
+        box = np.int0(box)
+
+        # mask = cv2.drawContours(mask, [box], 0, (127, 127, 127), 3)
+        height = np.linalg.norm(box[1] - box[0])
+
+        y = np.mean(allCnt[:, :, 1])
+
+        nearPoints = []
+        coords = np.array(np.where(mask < 127)).transpose()[:, ::-1]
+
+
+        for p in coords:
+            d = abs(p[1] - y)
+            if d <= height / 2.:
+                nearPoints.append(p)
+        nearPoints = np.array(nearPoints, dtype='int32')
+
+        try:
+            min_x = max(0, np.min(nearPoints[:, 0]) - 5)
+            max_x = np.max(nearPoints[:, 0]) + 5
+            min_y = max(0, np.min(nearPoints[:, 1]) - 5)
+            max_y = np.max(nearPoints[:, 1]) + 5
+            output = img[min_y: max_y, min_x: max_x]
+        except:
+            print('shinema huinya', nearPoints.shape)
+            return img, mask
+
+        cv2.imwrite('tmp_img.jpg', img[:, :])
+        cv2.imwrite('tmp.jpg', output[:, :])
+        cv2.imwrite('tmp_mask.jpg', mask)
+
+        return output, mask
+    else:
+        return img, mask
+
+# img = cv2.imread('tmp_img.jpg')[:, :, 0:1]
+# mask = cv2.imread('tmp_ormask.jpg')[:, :, 0:1]
+#
+# adjust_horizontal(img, mask)

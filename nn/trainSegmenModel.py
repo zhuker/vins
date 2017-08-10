@@ -134,10 +134,10 @@ def process(z):
             return [bcg_img, mask]
 
 
-pool = ThreadPool(8)
+pool = ThreadPool(cpu_count() // 2)
 
 
-def gen(batch_size=16):
+def gen(batch_size=8):
     x = np.zeros((batch_size, im_heigth, im_width, 1), dtype='float32')
     y = np.zeros((batch_size, im_heigth, im_width, 1), dtype=np.float)
 
