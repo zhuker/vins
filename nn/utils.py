@@ -69,3 +69,12 @@ def crop_rotate(image, angle, a, b):
 
     crop = rotated[miny:maxy, minx:maxx]
     return crop
+
+def drawBBox(bbox, img):
+    tl_x = int((bbox[0]-(bbox[2]/2))*img.shape[1])
+    tl_y = int((bbox[1]-(bbox[3]/2))*img.shape[0])
+    br_x = int((bbox[0]+(bbox[2]/2))*img.shape[1])
+    br_y = int((bbox[1]+(bbox[3]/2))*img.shape[0])
+
+    cv2.rectangle(img, (tl_x, tl_y), (br_x, br_y), (255,0,0), thickness=1, lineType=8, shift=0)
+    return img
