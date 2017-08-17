@@ -67,25 +67,44 @@
     for (let i = 0; i < 35; i++)
         list.push('imgs/' + i + '.jpg')
 
-    Rx.Observable.from(list).subscribe(
-        url => {
-            console.log(url);
-            let img = new Image;
-            let o = Rx.Observable.fromEvent(img, 'load').subscribe(
-                e => {
-                    let img = e.path[0];
-                    let canv = document.createElement('canvas');
-                    canv.width = 640;
-                    canv.height = 320;
-                    let ctx = canv.getContext('2d');
-                    ctx.drawImage(img, 0, 0, img.width, img.height);
-                    let haar = HAARDetector(canv);
-                    haar.detectBboxes();
+//    Rx.Observable.from(list).subscribe(
+//        url => {
+//            console.log(url);
+//            let img = new Image;
+//            let o = Rx.Observable.fromEvent(img, 'load').subscribe(
+//                e => {
+//                    let img = e.path[0];
+//                    let canv = document.createElement('canvas');
+//                    canv.width = 640;
+//                    canv.height = 320;
+//                    let ctx = canv.getContext('2d');
+//                    ctx.drawImage(img, 0, 0, img.width, img.height);
+//                    let haar = HAARDetector(canv);
+//                    haar.detectBboxes();
+//
+//                }
+//            );
+//            img.src = url;
+//            return o
+//        }
+//    );
 
-                }
-            );
+    Rx.Observable.from(list).flatMap(
+        url => {
+            let img = new Image, o = Rx.Observable.fromEvent(img, 'load');
             img.src = url;
             return o
+        }
+    ).subscribe(
+        e => {
+            let img = e.path[0];
+            let canv = document.createElement('canvas');
+            canv.width = 640;
+            canv.height = 320;
+            let ctx = canv.getContext('2d');
+            ctx.drawImage(img, 0, 0, img.width, img.height);
+            let haar = HAARDetector(canv);
+            haar.detectBboxes();
         }
     )
 
