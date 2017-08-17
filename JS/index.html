@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+<<<<<<< HEAD
+    <title>TimecodeDetector</title>
+
+    <script src="lib/jsobjectdetect.js"></script>
+    <script src="lib/classifier.js"></script>
+
+    <script src="lib/bundle.js"></script>
+    <script src="lib/keras.js"></script>
+    <script src="TimecodeDetector.js"></script>
+</head>
+<body>
+<script src="main.js"></script>
+=======
+    <title>Test Haar</title>
+    <script src="lib/jsobjectdetect.js"></script>
+    <script src="lib/classifier.js"></script>
+</head>
+<body>
+    <canvas id="input-canvas" width="640" height="320"></canvas>
+<script>
+
+    HAARDetector = function (canvas) {
+        this.canvas = canvas;
+        this.classifier = objectdetect.classifier;
+
+        this.detectBboxes = function () {
+            let context = this.canvas.getContext('2d');
+            this.detector = new objectdetect.detector(this.canvas.width, this.canvas.height, 1.1, this.classifier);
+            let rects = this.detector.detect(canvas, 2);
+            rects = this.magnify(rects);
+            rects = this.objectdetect.groupRectangles(rects, 1, 0.25);
+            console.log(rects)
+            this.drawRects(rects, context)
+        };
+
+        this.drawRects = function (rects, ctx) {
+            for (let i = 0; i < rects.length; ++i) {
+                let coord = rects[i];
+                ctx.beginPath();
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = 'rgba(0, 255, 255, 0.75)';
+                ctx.rect(coord[0], coord[1], coord[2] * 1.2, coord[3] * 1.2);
+                ctx.stroke();
+            }
+        };
+
+        this.magnify = function (rects) {
+            let m_width = this.canvas.width / 2;
+            for (let i = 0; i < rects.length; i++) {
+                let cx = rects[i][0] + rects[i][2] / 2;
+                let d = Math.abs(m_width - cx);
+                if ((d / m_width) < 0.3) {
+                    rects[i][0] = m_width - rects[i][2] / 2 - (0.05 * m_width)
+                }
+            }
+            return rects
+        };
+        return this
+    };
+
+    haar = HAARDetector(document.getElementById('input-canvas'));
+
+    let ctx = document.getElementById('input-canvas').getContext('2d');
+    let img = new Image;
+    img.onload = function() {
+        ctx.drawImage(img, 0, 0, img.width, img.height);
+        haar.detectBboxes();
+    };
+    img.src = 'imgs/3.jpg';
+
+</script>
+>>>>>>> origin/master
+</body>
+</html>
