@@ -1,5 +1,18 @@
-var iota = require("iota-array")
-var isBuffer = require("is-buffer")
+function iota(n) {
+  var result = new Array(n)
+  for(var i=0; i<n; ++i) {
+    result[i] = i
+  }
+  return result
+}
+
+function isBuffer (obj) {
+  return !!obj.constructor && typeof obj.constructor.isBuffer === 'function' && obj.constructor.isBuffer(obj)
+}
+
+function isSlowBuffer (obj) {
+  return typeof obj.readFloatLE === 'function' && typeof obj.slice === 'function' && isBuffer(obj.slice(0, 0))
+}
 
 var hasTypedArrays  = ((typeof Float64Array) !== "undefined")
 
@@ -339,5 +352,7 @@ function wrappedNDArrayCtor(data, shape, stride, offset) {
   var ctor = ctor_list[d+1]
   return ctor(data, shape, stride, offset)
 }
+
+
 
 module.exports = wrappedNDArrayCtor
