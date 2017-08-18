@@ -5,9 +5,9 @@
     <title>Test Haar</title>
     <script src="lib/jsobjectdetect.js"></script>
     <script src="lib/classifier.js"></script>
+    <script src="https://unpkg.com/@reactivex/rxjs@5.4.3/dist/global/Rx.js"></script>
 </head>
 <body>
-    <canvas id="input-canvas" width="640" height="320"></canvas>
 <script>
 
     HAARDetector = function (canvas) {
@@ -20,8 +20,8 @@
             let rects = this.detector.detect(canvas, 2);
             rects = this.magnify(rects);
             rects = this.objectdetect.groupRectangles(rects, 1, 0.25);
-            console.log(rects)
-            this.drawRects(rects, context)
+            console.log(rects);
+            // this.drawRects(rects, context)
         };
 
         this.drawRects = function (rects, ctx) {
@@ -49,16 +49,28 @@
         return this
     };
 
-    haar = HAARDetector(document.getElementById('input-canvas'));
+    let list = [];
+    for (let i = 1; i < 35; i++)
+        list.push('imgs/' + i + '.jpg')
 
-    let ctx = document.getElementById('input-canvas').getContext('2d');
-    let img = new Image;
-    img.onload = function() {
-        ctx.drawImage(img, 0, 0, img.width, img.height);
-        haar.detectBboxes();
-    };
-    img.src = 'imgs/3.jpg';
-
+    Rx.Observable.from(list).flatMap(
+        url => {
+            let img = new Image, o = Rx.Observable.fromEvent(img, 'load');
+            img.src = url;
+            return o
+        }
+    ).subscribe(
+        e => {
+            let img = e.path[0];
+            let canv = document.createElement('canvas');
+            canv.width = 640;
+            canv.height = 320;
+            let ctx = canv.getContext('2d');
+            ctx.drawImage(img, 0, 0, img.width, img.height);
+            let haar = HAARDetector(canv);
+            haar.detectBboxes()
+        }
+    )
 </script>
 </body>
 </html>
