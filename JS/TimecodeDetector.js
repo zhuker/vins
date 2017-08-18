@@ -33,10 +33,10 @@ TimecodeDetector.prototype._absToRel = function(rects, canvas) {
 
 TimecodeDetector.prototype._relToAbs = function(rects, canvas) {
     for (var i=0; i<rects.length; i++) {
-        rects[i][0] = Math.round(rects[i][0] * canvas.width)
-        rects[i][1] = Math.round(rects[i][1] * canvas.height)
-        rects[i][2] = Math.round(rects[i][2] * canvas.width)
-        rects[i][3] = Math.round(rects[i][3] * canvas.height)
+        rects[i][0] = Math.round((rects[i][0] - (0.1*rects[i][2])) * canvas.width)
+        rects[i][1] = Math.round((rects[i][1] - (0.1*rects[i][3])) * canvas.height)
+        rects[i][2] = Math.round(rects[i][2]*1.2 * canvas.width)
+        rects[i][3] = Math.round(rects[i][3]*1.2 * canvas.height)
     }
     return rects
 }
@@ -104,8 +104,8 @@ TimecodeDetector.prototype.readBBox = function(bbox, callback) {
     const inputData = { input_1: dataProcessedTensor.data }
 
     this.OCRModel.predict(inputData).then(outputData => {
-        var charProbs = outputData['activation_1']
-        var isTimecode = outputData['dense_1']
+        var charProbs = outputData['chars']
+        var isTimecode = outputData['conf']
         var res = {timecode: this.readLabel(charProbs, true), conf: isTimecode[0]}
         console.log(res)
         if (callback) {
