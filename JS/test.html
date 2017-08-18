@@ -49,45 +49,9 @@
         return this
     };
 
-    let canv = document.createElement('canvas');
-//    document.body.appendChild(canv);
-                    canv.width = 640;
-                    canv.height = 320;
-    // let ctx = document.getElementById('input-canvas').getContext('2d');
-//    ctx = canv.getContext('2d');
-//        haar = HAARDetector(canv);
-//    let img = new Image;
-//    img.onload = function() {
-//        ctx.drawImage(img, 0, 0, img.width, img.height);
-//        haar.detectBboxes();
-//    };
-//    img.src = 'imgs/3.jpg';
-
     let list = [];
-    for (let i = 0; i < 35; i++)
+    for (let i = 1; i < 35; i++)
         list.push('imgs/' + i + '.jpg')
-
-//    Rx.Observable.from(list).subscribe(
-//        url => {
-//            console.log(url);
-//            let img = new Image;
-//            let o = Rx.Observable.fromEvent(img, 'load').subscribe(
-//                e => {
-//                    let img = e.path[0];
-//                    let canv = document.createElement('canvas');
-//                    canv.width = 640;
-//                    canv.height = 320;
-//                    let ctx = canv.getContext('2d');
-//                    ctx.drawImage(img, 0, 0, img.width, img.height);
-//                    let haar = HAARDetector(canv);
-//                    haar.detectBboxes();
-//
-//                }
-//            );
-//            img.src = url;
-//            return o
-//        }
-//    );
 
     Rx.Observable.from(list).flatMap(
         url => {
@@ -104,25 +68,9 @@
             let ctx = canv.getContext('2d');
             ctx.drawImage(img, 0, 0, img.width, img.height);
             let haar = HAARDetector(canv);
-            haar.detectBboxes();
+            haar.detectBboxes()
         }
     )
-
-    //.subscribe(
-//        x => {
-//            console.log(x)
-//        }
-//    );
-
-//    let responseStream = requestStream
-//      .flatMap(function(url) {
-//          console.log(url)
-//        // return Rx.Observable.fromPromise(jQuery.getJSON(requestUrl));
-//      });
-//
-//    responseStream.subscribe(function(response) {
-//      // render `response` to the DOM however you wish
-//    });
 </script>
 </body>
 </html>
