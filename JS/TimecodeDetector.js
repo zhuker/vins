@@ -1,13 +1,13 @@
 var TimecodeDetector = function() {
-    this.innerCanvas = document.createElement('canvas')
+    this.innerCanvas = document.createElement('canvas');
 
-    this.haarCanvas = document.createElement('canvas')
-    this.haarCanvas.width = 320
-    this.haarCanvas.height = 160
+    this.haarCanvas = document.createElement('canvas');
+    this.haarCanvas.width = 320;
+    this.haarCanvas.height = 160;
 
-    this.cropCanvas = document.createElement('canvas')
-    this.cropCanvas.width = 189
-    this.cropCanvas.height = 27
+    this.cropCanvas = document.createElement('canvas');
+    this.cropCanvas.width = 189;
+    this.cropCanvas.height = 27;
 
     this.haarDetector = new objectdetect.detector(this.haarCanvas.width, this.haarCanvas.height, 1.1, objectdetect.classifier);
 
@@ -18,134 +18,153 @@ var TimecodeDetector = function() {
         metadata: 'weights/OCRmodel_weights_metadata.json'
       },
       gpu: false
-    })
-}
+    });
+
+    this.lastBbox = null;
+};
 
 TimecodeDetector.prototype._absToRel = function(rects, canvas) {
-    for (var i=0; i<rects.length; i++) {
-        rects[i][0] /= canvas.width
-        rects[i][1] /= canvas.height
-        rects[i][2] /= canvas.width
+    for (let i = 0; i<rects.length; i++) {
+        rects[i][0] /= canvas.width;
+        rects[i][1] /= canvas.height;
+        rects[i][2] /= canvas.width;
         rects[i][3] /= canvas.height
     }
     return rects
-}
+};
 
 TimecodeDetector.prototype._relToAbs = function(rects, canvas) {
-    for (var i=0; i<rects.length; i++) {
-        rects[i][0] = Math.round((rects[i][0] - (0.1*rects[i][2])) * canvas.width)
-        rects[i][1] = Math.round((rects[i][1] - (0.1*rects[i][3])) * canvas.height)
-        rects[i][2] = Math.round(rects[i][2]*1.2 * canvas.width)
+    for (let i = 0; i < rects.length; i++) {
+        rects[i][0] = Math.round((rects[i][0] - (0.1*rects[i][2])) * canvas.width);
+        rects[i][1] = Math.round((rects[i][1] - (0.1*rects[i][3])) * canvas.height);
+        rects[i][2] = Math.round(rects[i][2]*1.2 * canvas.width);
         rects[i][3] = Math.round(rects[i][3]*1.2 * canvas.height)
     }
     return rects
-}
+};
 
 TimecodeDetector.prototype._magnify = function(rects) {
-    var m_width = this.haarCanvas.width/2;
-    for (var i=0; i<rects.length; i++) {
-        var cx = rects[i][0] + rects[i][2]/2
-        var d = Math.abs(m_width - cx)
+    let m_width = this.haarCanvas.width/2;
+    for (let i = 0; i < rects.length; i++) {
+        let cx = rects[i][0] + rects[i][2]/2, d = Math.abs(m_width - cx);
         if ((d / m_width) < 0.3) {
             rects[i][0] = m_width - rects[i][2]/2
         }
     }
     return rects
-}
+};
 
 TimecodeDetector.prototype.detectBboxes = function(canvas) {
-    canvas = canvas || this.haarCanvas
-    var rects = this.haarDetector.detect(canvas, 2);
-    rects = this._magnify(rects)
-    rects = objectdetect.groupRectangles(rects, 1)
-    rects = this._absToRel(rects, canvas)
-    return rects
-}
-
-TimecodeDetector.prototype.readLabel = function(label, isTimecode){
-        var vocab = '0123456789:;'
-        function argmax(arr) {
-            maxId = -1
-            mval = -1
-            for (var i =0; i < vocab.length; i++) {
-                if (arr[i] > mval) {
-                    maxId = i
-                    mval = arr[i]
-                }
-            }
-            return maxId
-        }
-        var tc = ''
-        for (var i =0; i < 11; i++) {
-            tc += vocab[argmax(label.slice(i*12,(i+1)*12))]
-        }
-        return tc
+    canvas = canvas || this.haarCanvas;
+    let rects = this.haarDetector.detect(canvas, 2);
+    if (rects.lenght === 0) {
+        console.log('nihuya')
     }
+    rects = this._magnify(rects);
+    if (this.lastBbox) {
+        let b = this._relToAbs([this.lastBbox], canvas);
+        rects = rects.concat(b)
+    }
+    rects = objectdetect.groupRectangles(rects, 1, 0.25);
+    this.drawRects(rects, this.haarCanvas.getContext('2d'));
+    rects = this._absToRel(rects, canvas);
+    return rects
+};
+
+TimecodeDetector.prototype.drawRects = function (rects, ctx) {
+    for (let i = 0; i < rects.length; ++i) {
+        let coord = rects[i];
+        ctx.beginPath();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = 'rgba(0, 255, 255, 0.75)';
+        ctx.rect(coord[0], coord[1], coord[2] * 1.2, coord[3] * 1.2);
+        ctx.stroke();
+    }
+};
+
+TimecodeDetector.prototype.readLabel = function(label){
+    let vocab = '0123456789:;';
+    function argmax(arr) {
+        let maxId = -1, mval = -1;
+        for (let i =0; i < vocab.length; i++) {
+            if (arr[i] > mval) {
+                maxId = i;
+                mval = arr[i]
+            }
+        }
+        return maxId
+    }
+    let tc = '';
+    for (let i = 0; i < 11; i++) {
+        tc += vocab[argmax(label.slice(i*12, (i+1)*12))]
+    }
+    return tc
+};
 
 TimecodeDetector.prototype.readBBox = function(bbox, callback) {
-    var cropCoords = this._relToAbs([bbox], this.innerCanvas)[0]
-    var crop_ctx = this.cropCanvas.getContext('2d');
+    let cropCoords = this._relToAbs([bbox], this.innerCanvas)[0],
+        crop_ctx = this.cropCanvas.getContext('2d');
 
     crop_ctx.drawImage(this.innerCanvas, cropCoords[0], cropCoords[1], cropCoords[2], cropCoords[3],
         0, 0, this.cropCanvas.width, this.cropCanvas.height);
 
-    const imageData = crop_ctx.getImageData(0, 0, crop_ctx.canvas.width, crop_ctx.canvas.height)
-    const { data, width, height } = imageData
+    const imageData = crop_ctx.getImageData(0, 0, crop_ctx.canvas.width, crop_ctx.canvas.height);
+    const {data, width, height } = imageData;
 
-    var dataTensor = ndarray(new Float32Array(data), [width, height, 4])
-    var dataProcessedTensor = ndarray(new Float32Array(width * height * 3), [width, height, 3])
-    ndarray_ops.divseq(dataTensor, 255)
-    ndarray_ops.subseq(dataTensor, 0.5)
-    ndarray_ops.mulseq(dataTensor, 2)
-    ndarray_ops.assign(dataProcessedTensor.pick(null, null, 0), dataTensor.pick(null, null, 0))
-    ndarray_ops.assign(dataProcessedTensor.pick(null, null, 1), dataTensor.pick(null, null, 1))
-    ndarray_ops.assign(dataProcessedTensor.pick(null, null, 2), dataTensor.pick(null, null, 2))
+    let dataTensor = ndarray(new Float32Array(data), [width, height, 4]),
+        dataProcessedTensor = ndarray(new Float32Array(width * height * 3), [width, height, 3]);
+    ndarray_ops.divseq(dataTensor, 255);
+    ndarray_ops.subseq(dataTensor, 0.5);
+    ndarray_ops.mulseq(dataTensor, 2);
+    ndarray_ops.assign(dataProcessedTensor.pick(null, null, 0), dataTensor.pick(null, null, 0));
+    ndarray_ops.assign(dataProcessedTensor.pick(null, null, 1), dataTensor.pick(null, null, 1));
+    ndarray_ops.assign(dataProcessedTensor.pick(null, null, 2), dataTensor.pick(null, null, 2));
 
-    const inputData = { input_1: dataProcessedTensor.data }
+    const inputData = {input_1: dataProcessedTensor.data};
 
     this.OCRModel.predict(inputData).then(outputData => {
-        var charProbs = outputData['chars']
-        var isTimecode = outputData['conf']
-        var res = {timecode: this.readLabel(charProbs, true), conf: isTimecode[0]}
-        console.log(res)
+        let charProbs = outputData['chars'],
+            isTimecode = outputData['conf'],
+            res = {timecode: this.readLabel(charProbs, true), conf: isTimecode[0]};
+        console.log(res);
         if (callback) {
             callback(res)
         }
     })
-}
+};
 
 
 TimecodeDetector.prototype.getTimecode = function(img, callback) {
-    var inner_ctx = this.innerCanvas.getContext('2d');
-    inner_ctx.drawImage(img, 0, 0, img.width,    img.height,
-                   0, 0, this.innerCanvas.width, this.innerCanvas.height);
+    let inner_ctx = this.innerCanvas.getContext('2d'),
+        w = img.width || img.clientWidth,
+        h = img.height || img.clientHeight;
+    this.innerCanvas.width = w;
+    this.innerCanvas.height = h;
+    inner_ctx.drawImage(img, 0, 0, w, h, 0, 0, w, h);
 
-    var haar_ctx = this.haarCanvas.getContext('2d');
-    haar_ctx.drawImage(img, 0, 0, img.width,    img.height,
-                   0, 0, this.haarCanvas.width, this.haarCanvas.height);
+    let haar_ctx = this.haarCanvas.getContext('2d');
+    haar_ctx.drawImage(img, 0, 0, w, h, 0, 0, this.haarCanvas.width, this.haarCanvas.height);
 
-    var bboxes = this.detectBboxes(this.haarCanvas)
-    var preds = []
+    let bboxes = this.detectBboxes(this.haarCanvas),
+        preds = [];
 
-    var checkBox = function(self, currBBoxId) {
+    let checkBox = function(self, currBBoxId) {
         self.readBBox(bboxes[currBBoxId], function (res) {
-                preds.push(res)
-                predicted = true
-                if (preds.length == bboxes.length) {
-                    var maxConf = 0
-                    var maxId = 0
-                    for (var i=0; i < preds.length; i++) {
+                preds.push(res);
+                if (preds.length === bboxes.length) {
+                    let maxConf = 0, maxId = 0;
+                    for (let i = 0; i < preds.length; i++) {
                         if (preds[i].conf > maxConf) {
-                            maxConf = preds[i].conf
+                            maxConf = preds[i].conf;
                             maxId = i
                         }
                     }
 
-                    var bestResult = preds[maxId]
-                    var timecode = '__:__:__:__'
+                    let bestResult = preds[maxId], timecode = '__:__:__:__';
 
-                    if (bestResult.conf > 0.5) {
-                        timecode = bestResult.timecode
+                    if (bestResult.conf > 0.2) {
+                        timecode = bestResult.timecode;
+                        self.lastBbox = self._absToRel([bboxes[maxId]], self.innerCanvas)[0]
                     }
 
                     if (callback) {
@@ -155,7 +174,7 @@ TimecodeDetector.prototype.getTimecode = function(img, callback) {
                     checkBox(self, currBBoxId+1)
                 }
             })
-    }
+    };
     checkBox(this, 0)
-}
+};
 

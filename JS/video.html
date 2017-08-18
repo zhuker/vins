@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Test Haar</title>
+    <script src="lib/jsobjectdetect.js"></script>
+    <script src="lib/classifier.js"></script>
+    <script src="lib/bundle.js"></script>
+    <script src="lib/keras.js"></script>
+    <script src="TimecodeDetector.js"></script>
+    <script src="https://unpkg.com/@reactivex/rxjs@5.4.3/dist/global/Rx.js"></script>
+</head>
+<body>
+<video src="../nn/sdi/SHO015293.mp4" controls id="video" autoplay></video>
+<button id="button" disabled>Detect</button>
+<div id="result"></div>
+<div id="debug"></div>
+<script>
+    Detector = new TimecodeDetector();
+
+    button = document.querySelector('#button');
+    video = document.querySelector('#video');
+    result = document.querySelector('#result');
+    debug = document.querySelector('#debug');
+
+    Detector.OCRModel.ready().then(() => {
+        button.disabled = false;
+        debug.appendChild(Detector.cropCanvas);
+        debug.appendChild(Detector.haarCanvas);
+    });
+
+    button.addEventListener('click', () => {
+        this.disabled = true;
+        video.pause();
+        Detector.getTimecode(video, tc => {
+            button.disabled = false;
+            result.innerHTML = tc;
+            video.play();
+        })
+    })
+//    Detector.OCRModel.ready().then(() => {
+//        img = new Image;
+//        img.onload = function () {
+//            console.log(this);
+//            Detector.getTimecode(this, x => {console.log(x)})
+//        };
+//        img.src = 'imgs/1.jpg';
+//    })
+//
+//    Detector.OCRModel.ready().then(() => {
+//      Rx.Observable.from(list).flatMap(
+//          url => {
+//              let img = new Image, o = Rx.Observable.fromEvent(img, 'load');
+//              img.src = url;
+//              return o
+//            }
+//        ).subscribe(
+//            e => {
+//                let img = e.path[0];
+//
+//                Detector.getTimecode(img, function(timecode) {
+//                    console.log(timecode, img.src)
+//                })
+//
+//            }
+//        )
+//    })
+//    Rx.Observable.from(list).flatMap(
+//        url => {
+//            let img = new Image, o = Rx.Observable.fromEvent(img, 'load');
+//            img.src = url;
+//            return o
+//        }
+//    ).subscribe(
+//        e => {
+//            let img = e.path[0];
+//
+//            Detector.getTimecode(img, function(timecode) {
+//                console.log(timecode)
+//            })
+//
+//        }
+//    )
+</script>
+</body>
+</html>
