@@ -10,6 +10,7 @@ var TimecodeDetector = function() {
     this.cropCanvas.height = 27;
 
     this.haarDetector = new objectdetect.detector(this.haarCanvas.width, this.haarCanvas.height, 1.1, objectdetect.classifier);
+    this.haarCorrector = new objectdetect.detector(this.cropCanvas.width, this.cropCanvas.height, 1.05, objectdetect.classifier);
 
     this.OCRModel = new KerasJS.Model({
       filepaths: {
@@ -24,7 +25,7 @@ var TimecodeDetector = function() {
 };
 
 TimecodeDetector.prototype._absToRel = function(rects, canvas) {
-    for (let i = 0; i<rects.length; i++) {
+    for (let i = 0; i < rects.length; i++) {
         rects[i][0] /= canvas.width;
         rects[i][1] /= canvas.height;
         rects[i][2] /= canvas.width;
@@ -35,10 +36,20 @@ TimecodeDetector.prototype._absToRel = function(rects, canvas) {
 
 TimecodeDetector.prototype._relToAbs = function(rects, canvas) {
     for (let i = 0; i < rects.length; i++) {
-        rects[i][0] = Math.round((rects[i][0] - (0.1*rects[i][2])) * canvas.width);
-        rects[i][1] = Math.round((rects[i][1] - (0.1*rects[i][3])) * canvas.height);
-        rects[i][2] = Math.round(rects[i][2]*1.2 * canvas.width);
-        rects[i][3] = Math.round(rects[i][3]*1.2 * canvas.height)
+        rects[i][0] = Math.round(rects[i][0] * canvas.width);
+        rects[i][1] = Math.round(rects[i][1] * canvas.height);
+        rects[i][2] = Math.round(Math.min(rects[i][2], 1) * canvas.width);
+        rects[i][3] = Math.round(Math.min(rects[i][3], 1) * canvas.height)
+    }
+    return rects
+};
+
+TimecodeDetector.prototype._upscale = function(rects, wc = .1, hc = .1) {
+    for (let i = 0; i < rects.length; i++) {
+        rects[i][0] = Math.max(rects[i][0] - wc * rects[i][2] / 2, 0);
+        rects[i][1] = Math.max(rects[i][1] - hc * rects[i][3] / 2, 0);
+        rects[i][2] = rects[i][2] * (1 + wc);
+        rects[i][3] = rects[i][3] * (1 + hc)
     }
     return rects
 };
@@ -60,7 +71,10 @@ TimecodeDetector.prototype.detectBboxes = function(canvas) {
     if (rects.lenght === 0) {
         console.log('nihuya')
     }
+
     rects = this._magnify(rects);
+    rects = this._upscale(rects);
+
     if (this.lastBbox) {
         let b = this._relToAbs([this.lastBbox], canvas);
         rects = rects.concat(b)
@@ -107,6 +121,23 @@ TimecodeDetector.prototype.readBBox = function(bbox, callback) {
 
     crop_ctx.drawImage(this.innerCanvas, cropCoords[0], cropCoords[1], cropCoords[2], cropCoords[3],
         0, 0, this.cropCanvas.width, this.cropCanvas.height);
+
+    let correctedBboxes = this.haarCorrector.detect(this.cropCanvas, 1);
+    if (correctedBboxes.length) {
+        correctedBboxes = this._upscale(correctedBboxes, .2);
+        let m = 0, max_id = -1;
+        for (let i = 0; i < correctedBboxes.length; i++) {
+            let a = correctedBboxes[i][2]*correctedBboxes[i][3];
+            if (m < a) {
+                m = a;
+                max_id = i;
+            }
+        }
+        let b = correctedBboxes[max_id];
+        crop_ctx.drawImage(this.cropCanvas, b[0], b[1], b[2], b[3],
+            0, 0, this.cropCanvas.width, this.cropCanvas.height);
+
+    }
 
     const imageData = crop_ctx.getImageData(0, 0, crop_ctx.canvas.width, crop_ctx.canvas.height);
     const {data, width, height } = imageData;
